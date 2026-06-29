@@ -1,0 +1,30 @@
+# Distributed OCR Benchmark & Stress Testing Platform
+# Root project metadata.
+#
+# This file is intentionally minimal. Python tooling configuration
+# lives in backend/pyproject.toml so that the backend can be treated
+# as an independent package.
+
+[project]
+name = "ocr-benchmark-platform"
+version = "0.1.0"
+description = "Production-grade OCR evaluation and benchmarking platform"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [
+    { name = "OCR Platform Team" },
+]
+keywords = ["ocr", "benchmark", "stress-test", "pdf", "distributed"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+
+[project.urls]
+Homepage = "https://github.com/ocr-platform/ocr-benchmark-platform"
+Repository = "https://github.com/ocr-platform/ocr-benchmark-platform"
