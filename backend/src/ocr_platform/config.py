@@ -64,7 +64,8 @@ class Settings(BaseSettings):
     redis_url: str = Field(default="redis://localhost:6379/0", description="Redis URL")
     database_url: str | None = Field(default=None, description="PostgreSQL async URL")
 
-    # OCR Providers (optional until Milestone 3)
+    # OCR Providers
+    default_ocr_provider: str = Field(default="mock", description="Default OCR provider name")
     mistral_api_key: str | None = Field(default=None, description="Mistral OCR API key")
 
     # Frontend

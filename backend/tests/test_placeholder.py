@@ -9,9 +9,9 @@ from __future__ import annotations
 import pytest
 
 import ocr_platform
-from src.ocr_platform import __version__
-from src.ocr_platform.config import Settings, settings
-from src.ocr_platform.logging_config import configure_logging, get_logger
+from ocr_platform import __version__
+from ocr_platform.config import Settings, settings
+from ocr_platform.logging_config import configure_logging, get_logger
 
 
 class TestPackage:
@@ -42,6 +42,7 @@ class TestSettings:
         assert s.redis_url == "redis://localhost:6379/0"
         assert s.database_url is None
         assert s.mistral_api_key is None
+        assert s.default_ocr_provider == "mock"
         assert s.frontend_url == "http://localhost:3000"
 
     def test_settings_singleton_exists(self) -> None:
