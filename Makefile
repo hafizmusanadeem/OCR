@@ -34,6 +34,13 @@ worker:
 	@echo "Starting Celery worker..."
 	@cd backend && celery -A ocr_platform.jobs.celery_app worker --loglevel=info --concurrency=2
 
+# Scale workers (requires running Redis)
+scale-workers:
+	@echo "Scaling to 3 workers..."
+	@cd backend && for i in 1 2 3; do \
+		start /b celery -A ocr_platform.jobs.celery_app worker --loglevel=info --concurrency=2 -n worker%%i; \
+	done
+
 # Testing
 test:
 	cd backend && python -m pytest tests/ -v --cov=src --cov-report=term-missing

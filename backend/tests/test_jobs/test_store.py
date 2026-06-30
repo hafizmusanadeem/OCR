@@ -8,6 +8,7 @@ import pytest
 
 from ocr_platform.jobs.models import JobPageResult, JobStatus
 from ocr_platform.jobs.store import JobStore
+from ocr_platform.preprocessing.types import PageImage
 
 
 class TestJobStore:
@@ -152,3 +153,105 @@ class TestJobStore:
         job = store.get(job_id)
         assert job is not None
         assert job.status == JobStatus.PROCESSING
+
+
+class TestJobStorePageStorage:
+    """Page-level storage tests."""
+
+    def test_store_and_get_page_images(self) -> None:
+        store = JobStore()
+        job_id = store.create("test.pdf", "application/pdf", "mock", b"content")
+        pages = [
+            PageImage(page_number=1, image_data=b"img1", width=100, height=200, format="png"),
+            PageImage(page_number=2, image_data=b"img2", width=100, height=200, format="png"),
+        ]
+        store.store_page_images(job_id, pages)
+        assert store.get_page_image(job_id, 1) == b"img1"
+        assert store.get_page_image(job_id, 2) == b"img2"
+        assert store.get_page_image(job_id, 3) is None
+
+    def test_store_page_images_updates_job_count(self) -> None:
+        store = JobStore()
+        job_id = store.create("test.pdf", "application/pdf", "mock", b"content")
+        pages = [
+            PageImage(page_number=1, image_data=b"img1", width=100, height=200, format="png"),
+            PageImage(page_number=2, image_data=b"img2", width=100, height=200, format="png"),
+        ]
+        store.store_page_images(job_id, pages)
+        job = store.get(job_id)
+        assert job is not None
+        assert job.page_count == 2
+
+    def test_add_and_get_page_results(self) -> None:
+        store = JobStore()
+        job_id = store.create("test.pdf", "application/pdf", "mock", b"content")
+        store.add_page_result(job_id, 2, JobPageResult(page_number=2, text="world"))
+        store.add_page_result(job_id, 1, JobPageResult(page_number=1, text="hello"))
+        results = store.get_page_results(job_id)
+        assert len(results) == 2
+        assert results[0].page_number == 1
+        assert results[1].page_number == 2
+
+    def test_add_page_result_updates_pages_completed(self) -> None:
+        store = JobStore()
+        job_id = store.create("test.pdf", "application/pdf", "mock", b"content")
+        store.add_page_result(job_id, 1, JobPageResult(page_number=1, text="hello"))
+        job = store.get(job_id)
+        assert job is not None
+        assert job.pages_completed == 1
+        store.add_page_result(job_id, 2, JobPageResult(page_number=2, text="world"))
+        job = store.get(job_id)
+        assert job is not None
+        assert job.pages_completed == 2
+
+    def test_all_pages_done(self) -> None:
+        store = JobStore()
+        job_id = store.create("test.pdf", "application/pdf", "mock", b"content")
+        assert not store.all_pages_done(job_id, 2)
+        store.add_page_result(job_id, 1, JobPageResult(page_number=1, text="hello"))
+        assert not store.all_pages_done(job_id, 2)
+        store.add_page_result(job_id, 2, JobPageResult(page_number=2, text="world"))
+        assert store.all_pages_done(job_id, 2)
+
+    def test_complete_clears_page_data(self) -> None:
+        store = JobStore()
+        job_id = store.create("test.pdf", "application/pdf", "mock", b"content")
+        pages = [
+            PageImage(page_number=1, image_data=b"img1", width=100, height=200, format="png"),
+        ]
+        store.store_page_images(job_id, pages)
+        store.add_page_result(job_id, 1, JobPageResult(page_number=1, text="hello"))
+        store.complete(job_id, [JobPageResult(page_number=1, text="hello")], 10.0, 1)
+        assert store.get_page_image(job_id, 1) is None
+        assert store.get_page_results(job_id) == []
+
+    def test_fail_clears_page_data(self) -> None:
+        store = JobStore()
+        job_id = store.create("test.pdf", "application/pdf", "mock", b"content")
+        pages = [
+            PageImage(page_number=1, image_data=b"img1", width=100, height=200, format="png"),
+        ]
+        store.store_page_images(job_id, pages)
+        store.fail(job_id, "Error")
+        assert store.get_page_image(job_id, 1) is None
+
+    def test_thread_safety_page_results(self) -> None:
+        store = JobStore()
+        job_id = store.create("test.pdf", "application/pdf", "mock", b"content")
+
+        def add_result(page_num: int) -> None:
+            store.add_page_result(
+                job_id, page_num, JobPageResult(page_number=page_num, text=f"page{page_num}")
+            )
+
+        threads = [threading.Thread(target=add_result, args=(i,)) for i in range(1, 11)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert store.all_pages_done(job_id, 10)
+        results = store.get_page_results(job_id)
+        assert len(results) == 10
+        assert results[0].page_number == 1
+        assert results[9].page_number == 10

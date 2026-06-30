@@ -74,6 +74,7 @@ class Job(BaseModel):
         default=None, description="Total processing time in milliseconds"
     )
     page_count: int | None = Field(default=None, description="Number of pages in the document")
+    pages_completed: int = Field(default=0, description="Number of pages processed so far")
 
 
 class JobCreateResponse(BaseModel):
@@ -118,3 +119,4 @@ class JobDetailResponse(BaseModel):
     total_processing_time_ms: float | None = Field(
         default=None, description="Total processing time in milliseconds"
     )
+    pages_completed: int = Field(default=0, description="Number of pages processed so far")

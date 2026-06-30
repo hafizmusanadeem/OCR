@@ -85,6 +85,7 @@ class TestJob:
         assert job.error is None
         assert job.total_processing_time_ms is None
         assert job.page_count is None
+        assert job.pages_completed == 0
 
     def test_with_results(self) -> None:
         now = datetime.now(UTC)
@@ -99,10 +100,12 @@ class TestJob:
             pages=[JobPageResult(page_number=1, text="hello")],
             page_count=1,
             total_processing_time_ms=100.0,
+            pages_completed=1,
         )
         assert len(job.pages) == 1
         assert job.page_count == 1
         assert job.total_processing_time_ms == 100.0
+        assert job.pages_completed == 1
 
 
 class TestJobCreateResponse:
@@ -137,6 +140,7 @@ class TestJobDetailResponse:
         assert r.pages == []
         assert r.error is None
         assert r.page_count is None
+        assert r.pages_completed == 0
 
     def test_completed_job(self) -> None:
         now = datetime.now(UTC).isoformat()
@@ -150,11 +154,13 @@ class TestJobDetailResponse:
             page_count=1,
             pages=[JobPageResult(page_number=1, text="hello")],
             total_processing_time_ms=50.0,
+            pages_completed=1,
         )
         assert r.status == JobStatus.COMPLETED
         assert r.page_count == 1
         assert len(r.pages) == 1
         assert r.total_processing_time_ms == 50.0
+        assert r.pages_completed == 1
 
     def test_failed_job(self) -> None:
         now = datetime.now(UTC).isoformat()

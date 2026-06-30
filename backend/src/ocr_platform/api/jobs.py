@@ -13,7 +13,7 @@ from __future__ import annotations
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 
 from ocr_platform.config import settings
-from ocr_platform.jobs.models import JobCreateResponse, JobDetailResponse, JobStatus
+from ocr_platform.jobs.models import Job, JobCreateResponse, JobDetailResponse, JobStatus
 from ocr_platform.jobs.store import job_store
 from ocr_platform.jobs.tasks import process_ocr_job
 from ocr_platform.logging_config import get_logger
@@ -33,8 +33,12 @@ VALID_CONTENT_TYPES = (
 )
 
 
-def _job_to_response(job) -> JobDetailResponse:  # type: ignore[no-untyped-def]
+def _job_to_response(job: Job) -> JobDetailResponse:
     """Convert a Job model to a JobDetailResponse.
+
+    For jobs that are still in progress, page results are fetched from the
+    job store's partial result cache rather than the job's own ``pages``
+    attribute (which is only populated on completion).
 
     Args:
         job: Internal Job model.
@@ -42,6 +46,7 @@ def _job_to_response(job) -> JobDetailResponse:  # type: ignore[no-untyped-def]
     Returns:
         API-friendly response model.
     """
+    pages = job.pages if job.status == JobStatus.COMPLETED else job_store.get_page_results(job.id)
     return JobDetailResponse(
         job_id=job.id,
         status=job.status,
@@ -50,7 +55,8 @@ def _job_to_response(job) -> JobDetailResponse:  # type: ignore[no-untyped-def]
         created_at=job.created_at.isoformat(),
         updated_at=job.updated_at.isoformat(),
         page_count=job.page_count,
-        pages=job.pages,
+        pages=pages,
+        pages_completed=job.pages_completed,
         error=job.error,
         total_processing_time_ms=job.total_processing_time_ms,
     )

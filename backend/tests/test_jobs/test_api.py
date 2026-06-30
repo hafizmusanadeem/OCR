@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-from ocr_platform.jobs.models import JobPageResult
+from ocr_platform.jobs.models import JobPageResult, JobStatus
 from ocr_platform.jobs.store import job_store
 from ocr_platform.main import create_app
 
@@ -110,6 +110,8 @@ class TestGetJob:
         assert data["provider"] == "mock"
         assert data["pages"] == []
         assert data["error"] is None
+        assert data["pages_completed"] == 0
+        assert data["page_count"] is None
 
     def test_get_completed_job(self) -> None:
         job_id = job_store.create(
@@ -129,6 +131,7 @@ class TestGetJob:
         data = response.json()
         assert data["status"] == "completed"
         assert data["page_count"] == 1
+        assert data["pages_completed"] == 1
         assert len(data["pages"]) == 1
         assert data["pages"][0]["page_number"] == 1
         assert data["pages"][0]["text"] == "hello"
@@ -147,6 +150,31 @@ class TestGetJob:
         data = response.json()
         assert data["status"] == "failed"
         assert data["error"] == "Provider crashed"
+        assert data["pages_completed"] == 0
+
+    def test_get_processing_job_with_partial_results(self) -> None:
+        job_id = job_store.create(
+            filename="test.pdf",
+            content_type="application/pdf",
+            provider="mock",
+            content=b"fake",
+        )
+        job_store.update_status(job_id, JobStatus.PROCESSING)
+        job_store.store_page_images(
+            job_id,
+            [
+                MagicMock(page_number=1, image_data=b"a", width=10, height=10, format="png"),
+                MagicMock(page_number=2, image_data=b"b", width=10, height=10, format="png"),
+            ],
+        )
+        job_store.add_page_result(job_id, 1, JobPageResult(page_number=1, text="page one"))
+        response = client.get(f"/api/v1/jobs/{job_id}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "processing"
+        assert data["page_count"] == 2
+        assert data["pages_completed"] == 1
+        assert data["pages"][0]["text"] == "page one"
 
     def test_get_missing_job(self) -> None:
         response = client.get("/api/v1/jobs/nonexistent-id")
