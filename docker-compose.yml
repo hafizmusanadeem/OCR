@@ -54,6 +54,22 @@ services:
       - ocr-network
     command: ["python", "-m", "uvicorn", "ocr_platform.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ocr-worker
+    env_file:
+      - .env
+    volumes:
+      - ./backend/src:/app/src:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - ocr-network
+    command: ["celery", "-A", "ocr_platform.jobs.celery_app", "worker", "--loglevel=info", "--concurrency=2"]
+
   # Placeholder for frontend service (Milestone 11)
   # frontend:
   #   build:

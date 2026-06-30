@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from ocr_platform.api import health, metrics, ocr
+from ocr_platform.api import health, jobs, metrics, ocr
 from ocr_platform.config import settings
 from ocr_platform.logging_config import configure_logging, get_logger
 from ocr_platform.middleware.logging import LoggingMiddleware
@@ -78,6 +78,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(metrics.router)
     app.include_router(ocr.router)
+    app.include_router(jobs.router)
 
     return app
 

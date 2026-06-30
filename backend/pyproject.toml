@@ -21,6 +21,7 @@ classifiers = [
 ]
 
 dependencies = [
+    "celery[redis]>=5.4",
     "fastapi>=0.111",
     "httpx>=0.27",
     "Pillow>=10.0",
@@ -123,7 +124,7 @@ exclude = [
 ]
 
 [[tool.mypy.overrides]]
-module = ["tests.*", "prometheus_client.*"]
+module = ["tests.*", "prometheus_client.*", "celery.*"]
 disallow_untyped_defs = false
 
 [tool.pytest.ini_options]

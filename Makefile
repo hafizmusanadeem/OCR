@@ -29,6 +29,11 @@ dev:
 	@echo "Starting development server..."
 	@cd backend && python -m uvicorn ocr_platform.main:app --host 0.0.0.0 --port 8000 --reload
 
+# Worker
+worker:
+	@echo "Starting Celery worker..."
+	@cd backend && celery -A ocr_platform.jobs.celery_app worker --loglevel=info --concurrency=2
+
 # Testing
 test:
 	cd backend && python -m pytest tests/ -v --cov=src --cov-report=term-missing

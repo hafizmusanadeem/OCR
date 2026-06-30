@@ -4,3 +4,4 @@ Pillow>=10.0
 prometheus-client>=0.20
 pymupdf>=1.23
 python-multipart>=0.0.9
+celery[redis]>=5.4
