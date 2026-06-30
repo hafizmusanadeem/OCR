@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+from io import BytesIO
 from unittest.mock import MagicMock, patch
 
 import pytest
+from PIL import Image
 
-from ocr_platform.preprocessing.document import DEFAULT_DPI, DocumentPreprocessor
-from ocr_platform.preprocessing.types import DocumentType, PageImage
+from ocr_platform.preprocessing.document import (
+    DEFAULT_DPI,
+    DocumentPreprocessor,
+)
+from ocr_platform.preprocessing.types import DocumentType
 
 
 class TestDocumentPreprocessor:
@@ -56,9 +61,6 @@ class TestDocumentPreprocessor:
 
     def test_process_image_with_pillow(self) -> None:
         """Test image pass-through with a real Pillow-generated image."""
-        from PIL import Image
-        from io import BytesIO
-
         buf = BytesIO()
         img = Image.new("RGB", (50, 30), color="red")
         img.save(buf, format="PNG")
@@ -147,8 +149,8 @@ class TestDocumentPreprocessor:
     def test_process_pdf_missing_fitz(self) -> None:
         """Test graceful error when PyMuPDF is not installed."""
         with patch(
-            "ocr_platform.preprocessing.document.fitz",
-            side_effect=ImportError("No module named 'fitz'"),
+            "ocr_platform.preprocessing.document._FITZ_AVAILABLE",
+            False,
         ):
             preprocessor = DocumentPreprocessor()
             with pytest.raises(RuntimeError, match="PyMuPDF"):
@@ -171,9 +173,6 @@ class TestDocumentPreprocessor:
 
     def test_preprocess_image_integration(self) -> None:
         """Test preprocess dispatch for image."""
-        from PIL import Image
-        from io import BytesIO
-
         buf = BytesIO()
         img = Image.new("RGB", (10, 10), color="blue")
         img.save(buf, format="PNG")

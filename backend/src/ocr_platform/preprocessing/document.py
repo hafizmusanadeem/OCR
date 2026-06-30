@@ -69,8 +69,7 @@ class DocumentPreprocessor:
             return self._process_image(content, doc_type)
 
         raise ValueError(
-            f"Unsupported document type: {content_type}. "
-            f"Supported: PDF, PNG, JPEG, TIFF."
+            f"Unsupported document type: {content_type}. " f"Supported: PDF, PNG, JPEG, TIFF."
         )
 
     def _detect_type(self, content_type: str) -> DocumentType:
@@ -98,8 +97,7 @@ class DocumentPreprocessor:
         """
         if not _FITZ_AVAILABLE:
             raise RuntimeError(
-                "PDF processing requires PyMuPDF. "
-                "Install with: pip install pymupdf"
+                "PDF processing requires PyMuPDF. " "Install with: pip install pymupdf"
             )
 
         pages: list[PageImage] = []
@@ -146,8 +144,7 @@ class DocumentPreprocessor:
         """
         if not _PILLOW_AVAILABLE:
             raise RuntimeError(
-                "Image processing requires Pillow. "
-                "Install with: pip install Pillow"
+                "Image processing requires Pillow. " "Install with: pip install Pillow"
             )
 
         try:

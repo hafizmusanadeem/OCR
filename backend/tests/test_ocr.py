@@ -216,17 +216,19 @@ class TestOcrUpload:
         mock_page.height = 10
         mock_page.format = "png"
 
-        with patch(
-            "ocr_platform.api.ocr.DocumentPreprocessor.preprocess",
-            return_value=[mock_page],
-        ):
-            with patch(
+        with (
+            patch(
+                "ocr_platform.api.ocr.DocumentPreprocessor.preprocess",
+                return_value=[mock_page],
+            ),
+            patch(
                 "ocr_platform.providers.mock.MockProvider.recognize",
                 side_effect=RuntimeError("Simulated OCR failure"),
-            ):
-                response = client.post(
-                    "/api/v1/ocr",
-                    files={"file": ("test.pdf", b"x", "application/pdf")},
-                )
+            ),
+        ):
+            response = client.post(
+                "/api/v1/ocr",
+                files={"file": ("test.pdf", b"x", "application/pdf")},
+            )
         assert response.status_code == 502
         assert "page 1" in response.text.lower()
