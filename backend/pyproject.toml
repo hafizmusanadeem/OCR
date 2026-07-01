@@ -21,6 +21,8 @@ classifiers = [
 ]
 
 dependencies = [
+    "alembic>=1.13",
+    "asyncpg>=0.29",
     "celery[redis]>=5.4",
     "fastapi>=0.111",
     "httpx>=0.27",
@@ -30,12 +32,14 @@ dependencies = [
     "pydantic-settings>=2.0",
     "pymupdf>=1.23",
     "python-multipart>=0.0.9",
+    "sqlalchemy[asyncio]>=2.0",
     "structlog>=24.0",
     "uvicorn[standard]>=0.30",
 ]
 
 [project.optional-dependencies]
 dev = [
+    "aiosqlite>=0.20",
     "black>=24.0",
     "httpx>=0.27",
     "mypy>=1.10",
@@ -96,8 +100,9 @@ select = [
     "PERF",# perflint
 ]
 ignore = [
-    "E501",  # Line too long (handled by black)
-    "B008",  # FastAPI File/Form defaults are idiomatic
+    "E501",   # Line too long (handled by black)
+    "B008",   # FastAPI File/Form defaults are idiomatic
+    "PLC0415", # Allow imports inside functions (lazy imports for circular deps)
 ]
 
 [tool.ruff.lint.pydocstyle]
@@ -124,7 +129,7 @@ exclude = [
 ]
 
 [[tool.mypy.overrides]]
-module = ["tests.*", "prometheus_client.*", "celery.*"]
+module = ["tests.*", "prometheus_client.*", "celery.*", "sqlalchemy.*"]
 disallow_untyped_defs = false
 
 [tool.pytest.ini_options]

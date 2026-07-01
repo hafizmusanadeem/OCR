@@ -40,7 +40,9 @@ class TestSettings:
         assert s.host == "0.0.0.0"
         assert s.port == 8000  # noqa: PLR2004
         assert s.redis_url == "redis://localhost:6379/0"
-        assert s.database_url is None
+        assert (
+            s.database_url == "postgresql+asyncpg://postgres:postgres@localhost:5432/ocr_platform"
+        )
         assert s.mistral_api_key is None
         assert s.default_ocr_provider == "mock"
         assert s.frontend_url == "http://localhost:3000"

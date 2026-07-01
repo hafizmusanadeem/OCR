@@ -1,8 +1,8 @@
-"""Thread-safe in-memory job store.
+"""Thread-safe in-memory job store with optional database write-through.
 
 Stores job metadata, file content, per-page image data, and aggregated
-document results in memory. Will be replaced by a proper database backend
-in Milestone 8.
+document results in memory. When a database URL is configured, writes are
+mirrored to PostgreSQL for persistence across restarts.
 """
 
 from __future__ import annotations
@@ -12,11 +12,27 @@ import uuid
 from datetime import UTC, datetime
 
 from ocr_platform.jobs.models import DocumentResult, Job, JobPageResult, JobStatus
+from ocr_platform.logging_config import get_logger
 from ocr_platform.preprocessing.types import PageImage
+
+logger = get_logger(__name__)
+
+# Lazy import guard for db.sync to avoid circular imports
+_JobRepositorySync = None
+
+
+def _get_db_sync():  # noqa: PLC0415
+    """Lazy import of JobRepositorySync to avoid circular imports."""
+    global _JobRepositorySync  # noqa: PLW0603
+    if _JobRepositorySync is None:
+        from ocr_platform.db.sync import JobRepositorySync
+
+        _JobRepositorySync = JobRepositorySync
+    return _JobRepositorySync
 
 
 class JobStore:
-    """Thread-safe in-memory storage for OCR jobs and their file contents.
+    """Thread-safe in-memory storage for OCR jobs with optional DB persistence.
 
     Attributes:
         _jobs: Mapping of job_id → Job metadata.
@@ -25,15 +41,20 @@ class JobStore:
         _page_results: Mapping of job_id → {page_number → JobPageResult}.
         _document_results: Mapping of job_id → DocumentResult.
         _lock: Reentrant lock for thread-safe operations.
+        _db: Optional synchronous database repository.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, db=None) -> None:  # type: ignore[no-untyped-def]
         self._jobs: dict[str, Job] = {}
         self._contents: dict[str, bytes] = {}
         self._page_images: dict[str, dict[int, bytes]] = {}
         self._page_results: dict[str, dict[int, JobPageResult]] = {}
         self._document_results: dict[str, DocumentResult] = {}
         self._lock = threading.RLock()
+        self._db = db
+
+    def _db_enabled(self) -> bool:
+        return self._db is not None
 
     def create(
         self,
@@ -67,10 +88,20 @@ class JobStore:
         with self._lock:
             self._jobs[job_id] = job
             self._contents[job_id] = content
+
+        if self._db_enabled():
+            try:
+                self._db.create_job(job)  # type: ignore[union-attr]
+            except Exception as exc:
+                logger.warning("db_create_job_failed", job_id=job_id, error=str(exc))
+
         return job_id
 
     def get(self, job_id: str) -> Job | None:
         """Retrieve a job by ID.
+
+        Checks in-memory first, then falls back to the database if the
+        job is not found in memory.
 
         Args:
             job_id: Unique job identifier.
@@ -79,7 +110,22 @@ class JobStore:
             The Job object or ``None`` if not found.
         """
         with self._lock:
-            return self._jobs.get(job_id)
+            job = self._jobs.get(job_id)
+
+        if job is not None:
+            return job
+
+        if self._db_enabled():
+            try:
+                db_job = self._db.get_job(job_id)  # type: ignore[union-attr]
+                if db_job is not None:
+                    with self._lock:
+                        self._jobs[job_id] = db_job
+                    return db_job
+            except Exception as exc:
+                logger.warning("db_get_job_failed", job_id=job_id, error=str(exc))
+
+        return None
 
     def get_content(self, job_id: str) -> bytes | None:
         """Retrieve the raw file content for a job.
@@ -141,6 +187,17 @@ class JobStore:
             job.pages_completed = len(self._page_results[job_id])
             job.updated_at = datetime.now(UTC)
 
+        if self._db_enabled():
+            try:
+                self._db.add_page_result(job_id, result)  # type: ignore[union-attr]
+            except Exception as exc:
+                logger.warning(
+                    "db_add_page_result_failed",
+                    job_id=job_id,
+                    page_number=page_number,
+                    error=str(exc),
+                )
+
     def get_page_results(self, job_id: str) -> list[JobPageResult]:
         """Retrieve all page results for a job, sorted by page number.
 
@@ -152,7 +209,20 @@ class JobStore:
         """
         with self._lock:
             results = self._page_results.get(job_id, {})
-            return [results[page_num] for page_num in sorted(results.keys())]
+            if results:
+                return [results[page_num] for page_num in sorted(results.keys())]
+
+        if self._db_enabled():
+            try:
+                db_results = self._db.get_page_results(job_id)  # type: ignore[union-attr]
+                if db_results:
+                    with self._lock:
+                        self._page_results[job_id] = {r.page_number: r for r in db_results}
+                    return db_results
+            except Exception as exc:
+                logger.warning("db_get_page_results_failed", job_id=job_id, error=str(exc))
+
+        return []
 
     def all_pages_done(self, job_id: str, expected_count: int) -> bool:
         """Check whether all pages have been processed.
@@ -209,6 +279,13 @@ class JobStore:
             job.status = status
             job.updated_at = datetime.now(UTC)
 
+        if self._db_enabled():
+            try:
+                job = self._jobs[job_id]
+                self._db.update_job(job)  # type: ignore[union-attr]
+            except Exception as exc:
+                logger.warning("db_update_job_failed", job_id=job_id, error=str(exc))
+
     def complete(
         self,
         job_id: str,
@@ -239,6 +316,14 @@ class JobStore:
             self._contents.pop(job_id, None)
             self._clear_page_data(job_id)
 
+        if self._db_enabled():
+            try:
+                self._db.complete_job(  # type: ignore[union-attr]
+                    job_id, pages, total_processing_time_ms, page_count
+                )
+            except Exception as exc:
+                logger.warning("db_complete_job_failed", job_id=job_id, error=str(exc))
+
     def fail(self, job_id: str, error: str) -> None:
         """Mark a job as failed.
 
@@ -257,6 +342,12 @@ class JobStore:
             # Free memory: delete content after failure
             self._contents.pop(job_id, None)
             self._clear_page_data(job_id)
+
+        if self._db_enabled():
+            try:
+                self._db.fail_job(job_id, error)  # type: ignore[union-attr]
+            except Exception as exc:
+                logger.warning("db_fail_job_failed", job_id=job_id, error=str(exc))
 
     def delete(self, job_id: str) -> None:
         """Remove a job and all associated data from the store.
@@ -289,5 +380,15 @@ class JobStore:
             return sorted(self._jobs.values(), key=lambda j: j.created_at)
 
 
-# Global singleton instance used throughout the application
-job_store = JobStore()
+# Global singleton instance — initialized with DB if DATABASE_URL is available
+from ocr_platform.db.engine import DATABASE_URL  # noqa: E402
+
+if DATABASE_URL is not None:
+    try:
+        job_store = JobStore(db=_get_db_sync()())
+        logger.info("job_store_initialized_with_db")
+    except Exception as exc:
+        logger.warning("job_store_db_init_failed", error=str(exc))
+        job_store = JobStore()
+else:
+    job_store = JobStore()

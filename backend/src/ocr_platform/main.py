@@ -1,7 +1,8 @@
 """OCR Platform FastAPI application factory.
 
 Bootstraps the FastAPI application with routers, middleware, CORS,
-and lifespan management.
+and lifespan management. On startup, creates database tables if the
+PostgreSQL backend is configured.
 """
 
 from __future__ import annotations
@@ -14,6 +15,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from ocr_platform.api import health, jobs, metrics, ocr
 from ocr_platform.config import settings
+from ocr_platform.db.engine import DATABASE_URL, close_engine, get_engine
+from ocr_platform.db.models import Base
 from ocr_platform.logging_config import configure_logging, get_logger
 from ocr_platform.middleware.logging import LoggingMiddleware
 
@@ -26,6 +29,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: ARG001
 
     Handles startup and shutdown events:
     - Configures structured logging on startup.
+    - Creates database tables if PostgreSQL is configured.
     - Logs application ready state.
 
     Args:
@@ -42,7 +46,22 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:  # noqa: ARG001
         environment=settings.app_env,
         debug=settings.debug,
     )
+
+    # Initialize database tables if configured
+    if DATABASE_URL is not None:
+        try:
+            engine = get_engine()
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+            logger.info("database_tables_initialized")
+        except Exception as exc:
+            logger.warning("database_init_failed", error=str(exc))
+
     yield
+
+    # Shutdown
+    if DATABASE_URL is not None:
+        await close_engine()
     logger.info("application_shutdown")
 
 

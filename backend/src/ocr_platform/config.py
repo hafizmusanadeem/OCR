@@ -62,7 +62,10 @@ class Settings(BaseSettings):
 
     # Infrastructure
     redis_url: str = Field(default="redis://localhost:6379/0", description="Redis URL")
-    database_url: str | None = Field(default=None, description="PostgreSQL async URL")
+    database_url: str = Field(
+        default="postgresql+asyncpg://postgres:postgres@localhost:5432/ocr_platform",
+        description="PostgreSQL async URL",
+    )
 
     # OCR Providers
     default_ocr_provider: str = Field(default="mock", description="Default OCR provider name")
