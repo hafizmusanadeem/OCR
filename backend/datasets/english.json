@@ -1,0 +1,23 @@
+{
+  "name": "English Text Dataset",
+  "category": "english",
+  "description": "Standard English text samples with mixed punctuation, numbers, and formatting.",
+  "language": "en",
+  "pages": [
+    {
+      "page_number": 1,
+      "ground_truth": "The quick brown fox jumps over the lazy dog. This pangram contains every letter of the English alphabet at least once.",
+      "tags": ["pangram", "ascii"]
+    },
+    {
+      "page_number": 2,
+      "ground_truth": "In 2024, the company reported revenue of $42.5 million, representing a 17% increase year-over-year. The CEO stated: 'We are pleased with these results.'",
+      "tags": ["numbers", "currency", "quotes"]
+    },
+    {
+      "page_number": 3,
+      "ground_truth": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam.",
+      "tags": ["latin", "paragraph"]
+    }
+  ]
+}

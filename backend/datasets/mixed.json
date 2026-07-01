@@ -1,0 +1,23 @@
+{
+  "name": "Mixed Language Dataset",
+  "category": "mixed",
+  "description": "Mixed-language documents combining English, Arabic, Urdu, and Hebrew in the same page.",
+  "language": "mixed",
+  "pages": [
+    {
+      "page_number": 1,
+      "ground_truth": "Welcome to the multilingual document. مرحبا بكم في الوثيقة متعددة اللغات. This page contains English and Arabic text side by side.",
+      "tags": ["mixed", "english-arabic"]
+    },
+    {
+      "page_number": 2,
+      "ground_truth": "The conference will be held in Dubai. کانفرنس دبئی میں منعقد ہوگی۔ The speakers include Dr. Ahmed and Prof. Smith.",
+      "tags": ["mixed", "english-urdu"]
+    },
+    {
+      "page_number": 3,
+      "ground_truth": "Price: $100. السعر: ١٠٠ دولار. מחיר: 100 דולר. क़ीमत: १०० डॉलर.",
+      "tags": ["mixed", "numbers", "currency"]
+    }
+  ]
+}

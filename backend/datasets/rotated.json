@@ -1,0 +1,23 @@
+{
+  "name": "Rotated Text Dataset",
+  "category": "rotated",
+  "description": "Text samples that are commonly rotated or skewed in scanned documents.",
+  "language": "en",
+  "pages": [
+    {
+      "page_number": 1,
+      "ground_truth": "This text is rotated 90 degrees clockwise. It simulates a landscape page scan with sideways text.",
+      "tags": ["rotated-90", "landscape"]
+    },
+    {
+      "page_number": 2,
+      "ground_truth": "This text is rotated 180 degrees. It simulates an upside-down document scan.",
+      "tags": ["rotated-180", "upside-down"]
+    },
+    {
+      "page_number": 3,
+      "ground_truth": "Slightly skewed text at a 5-degree angle. Common in flatbed scanner outputs.",
+      "tags": ["skewed-5", "scanner"]
+    }
+  ]
+}

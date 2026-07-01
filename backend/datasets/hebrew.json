@@ -1,0 +1,23 @@
+{
+  "name": "Hebrew Text Dataset",
+  "category": "hebrew",
+  "description": "Hebrew (RTL) text samples with modern and biblical text, including numerals and punctuation.",
+  "language": "he",
+  "pages": [
+    {
+      "page_number": 1,
+      "ground_truth": "עברית היא שפה שמית המדוברת בישראל ובקהילות יהודיות ברחבי העולם.",
+      "tags": ["rtl", "prose"]
+    },
+    {
+      "page_number": 2,
+      "ground_truth": "בְּרֵאשִׁית בָּרָא אֱלֹהִים אֵת הַשָּׁמַיִם וְאֵת הָאָרֶץ.",
+      "tags": ["rtl", "biblical", "vowels"]
+    },
+    {
+      "page_number": 3,
+      "ground_truth": "בשנת 2024, אוכלוסיית ישראל עברה את 10 מיליון תושבים.",
+      "tags": ["rtl", "numbers"]
+    }
+  ]
+}

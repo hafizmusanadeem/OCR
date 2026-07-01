@@ -1,0 +1,23 @@
+{
+  "name": "Low Quality Text Dataset",
+  "category": "low_quality",
+  "description": "Text samples with simulated noise, blur, and poor contrast that challenge OCR engines.",
+  "language": "en",
+  "pages": [
+    {
+      "page_number": 1,
+      "ground_truth": "This page simulates a low-resolution fax transmission. Some characters may be merged or broken.",
+      "tags": ["fax", "low-resolution"]
+    },
+    {
+      "page_number": 2,
+      "ground_truth": "Water damaged document. Ink has smeared and some letters are barely legible. The text should still be recoverable.",
+      "tags": ["water-damage", "smear"]
+    },
+    {
+      "page_number": 3,
+      "ground_truth": "Photocopy of a photocopy. Contrast is extremely low and the page has speckle noise throughout.",
+      "tags": ["photocopy", "noise", "low-contrast"]
+    }
+  ]
+}

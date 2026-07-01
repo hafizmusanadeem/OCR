@@ -1,0 +1,23 @@
+{
+  "name": "Table Text Dataset",
+  "category": "tables",
+  "description": "Structured table data with rows, columns, and aligned text that challenges OCR layout understanding.",
+  "language": "en",
+  "pages": [
+    {
+      "page_number": 1,
+      "ground_truth": "Product    | Price  | Quantity | Total\nApple      | $1.50  | 10       | $15.00\nBanana     | $0.75  | 20       | $15.00\nCherry     | $2.00  | 5        | $10.00\nTotal      |        | 35       | $40.00",
+      "tags": ["table", "csv-like", "aligned"]
+    },
+    {
+      "page_number": 2,
+      "ground_truth": "Name        Age    City        Country\nAlice       30     New York    USA\nBob         25     London      UK\nCharlie     35     Tokyo       Japan\nDiana       28     Paris       France",
+      "tags": ["table", "columns", "aligned"]
+    },
+    {
+      "page_number": 3,
+      "ground_truth": "Q1 2024 Revenue by Region:\nNorth America | $12.5M\nEurope        | $8.3M\nAsia Pacific  | $6.7M\nLatin America | $2.1M\nTotal         | $29.6M",
+      "tags": ["table", "financial", "aligned"]
+    }
+  ]
+}

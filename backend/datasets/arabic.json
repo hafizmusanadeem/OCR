@@ -1,0 +1,23 @@
+{
+  "name": "Arabic Text Dataset",
+  "category": "arabic",
+  "description": "Arabic (RTL) text samples with classical and modern prose, numerals, and religious text.",
+  "language": "ar",
+  "pages": [
+    {
+      "page_number": 1,
+      "ground_truth": "اللغة العربية هي إحدى أكثر اللغات انتشاراً في العالم. تُستخدم في الوطن العربي وبلدان أخرى.",
+      "tags": ["rtl", "prose"]
+    },
+    {
+      "page_number": 2,
+      "ground_truth": "بسم الله الرحمن الرحيم. الحمد لله رب العالمين، الرحمن الرحيم، مالك يوم الدين.",
+      "tags": ["rtl", "religious"]
+    },
+    {
+      "page_number": 3,
+      "ground_truth": "في عام 2024، بلغ عدد سكان المملكة العربية السعودية 36 مليون نسمة.",
+      "tags": ["rtl", "numbers"]
+    }
+  ]
+}

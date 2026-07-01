@@ -1,0 +1,23 @@
+{
+  "name": "Urdu Text Dataset",
+  "category": "urdu",
+  "description": "Urdu (RTL) text samples with poetry, prose, and formal writing.",
+  "language": "ur",
+  "pages": [
+    {
+      "page_number": 1,
+      "ground_truth": "اردو ہندوستانی زبانوں کا ایک خاندان ہے۔ یہ ہندوستان اور پاکستان میں بولی جاتی ہے۔",
+      "tags": ["rtl", "prose"]
+    },
+    {
+      "page_number": 2,
+      "ground_truth": "علامہ اقبال نے فرمایا: خودی کو کر بلند اتنا کہ ہر تقدیر سے پہلے، خدا بندے سے خود پوچھے بتا تیری رضا کیا ہے۔",
+      "tags": ["rtl", "poetry", "quotes"]
+    },
+    {
+      "page_number": 3,
+      "ground_truth": "سال 2024 میں، پاکستان کی آبادی 24 کروڑ سے تجاوز کر گئی۔",
+      "tags": ["rtl", "numbers"]
+    }
+  ]
+}
