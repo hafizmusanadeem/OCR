@@ -6,8 +6,8 @@ The task pipeline is now split into three stages:
    and dispatches a Celery chord for concurrent page processing.
 2. ``process_page`` — Runs OCR on a single page image. Executed in
    parallel by multiple workers.
-3. ``finalize_job`` — Callback that aggregates all page results and
-   marks the job as completed.
+3. ``finalize_job`` — Callback that aggregates all page results, builds a
+   :class:`~ocr_platform.jobs.models.DocumentResult`, and marks the job as completed.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ import asyncio
 
 from celery import chord  # type: ignore[import-untyped]
 
+from ocr_platform.jobs.aggregator import DocumentAggregator
 from ocr_platform.jobs.celery_app import celery_app
 from ocr_platform.jobs.models import JobPageResult, JobStatus
 from ocr_platform.jobs.store import job_store
@@ -106,7 +107,8 @@ def finalize_job(
 
     This is the chord callback that runs after all ``process_page``
     tasks for a job have finished. It reads results from the job store,
-    computes totals, and updates the job status.
+    aggregates them into a :class:`~ocr_platform.jobs.models.DocumentResult`,
+    stores the document, and updates the job status.
 
     Args:
         _results: List of return values from the header tasks (ignored in
@@ -130,10 +132,21 @@ def finalize_job(
                 total_processing_time_ms=round(total_time, 3),
                 page_count=expected_count,
             )
+
+            # Build aggregated document result
+            document = DocumentAggregator.aggregate(
+                job_id=job_id,
+                pages=page_results,
+                total_processing_time_ms=total_time,
+            )
+            job_store.store_document(job_id, document)
+
             logger.info(
                 "finalize_job_completed",
                 job_id=job_id,
                 page_count=expected_count,
+                word_count=document.word_count,
+                character_count=document.character_count,
             )
         else:
             completed = len(page_results)

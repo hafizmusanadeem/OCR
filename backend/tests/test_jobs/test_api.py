@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
+from ocr_platform.jobs.aggregator import DocumentAggregator
 from ocr_platform.jobs.models import JobPageResult, JobStatus
 from ocr_platform.jobs.store import job_store
 from ocr_platform.main import create_app
@@ -180,6 +181,83 @@ class TestGetJob:
         response = client.get("/api/v1/jobs/nonexistent-id")
         assert response.status_code == 404
         assert "not found" in response.text.lower()
+
+    def test_get_job_document_completed(self) -> None:
+        job_id = job_store.create(
+            filename="test.pdf",
+            content_type="application/pdf",
+            provider="mock",
+            content=b"fake",
+        )
+        pages = [
+            JobPageResult(page_number=1, text="hello world", confidence=0.9, language="en"),
+            JobPageResult(page_number=2, text="bonjour", confidence=0.8, language="fr"),
+        ]
+        document = DocumentAggregator.aggregate(job_id, pages, 100.0)
+        job_store.store_document(job_id, document)
+        job_store.complete(
+            job_id,
+            pages=pages,
+            total_processing_time_ms=100.0,
+            page_count=2,
+        )
+
+        response = client.get(f"/api/v1/jobs/{job_id}/document")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["job_id"] == job_id
+        assert data["page_count"] == 2
+        assert "hello world" in data["document_text"]
+        assert "bonjour" in data["document_text"]
+        assert data["languages"] == ["en", "fr"]
+        assert data["average_confidence"] == 0.85
+        assert data["word_count"] == 3
+        assert data["total_processing_time_ms"] == 100.0
+
+    def test_get_job_document_not_found(self) -> None:
+        response = client.get("/api/v1/jobs/nonexistent/document")
+        assert response.status_code == 404
+
+    def test_get_job_document_pending(self) -> None:
+        job_id = job_store.create(
+            filename="test.pdf",
+            content_type="application/pdf",
+            provider="mock",
+            content=b"fake",
+        )
+        response = client.get(f"/api/v1/jobs/{job_id}/document")
+        assert response.status_code == 202
+        assert "pending" in response.text.lower()
+
+    def test_get_job_document_failed(self) -> None:
+        job_id = job_store.create(
+            filename="test.pdf",
+            content_type="application/pdf",
+            provider="mock",
+            content=b"fake",
+        )
+        job_store.fail(job_id, "OCR crashed")
+        response = client.get(f"/api/v1/jobs/{job_id}/document")
+        assert response.status_code == 422
+        assert "failed" in response.text.lower()
+
+    def test_get_job_document_processing(self) -> None:
+        job_id = job_store.create(
+            filename="test.pdf",
+            content_type="application/pdf",
+            provider="mock",
+            content=b"fake",
+        )
+        job_store.update_status(job_id, JobStatus.PROCESSING)
+        job_store.store_page_images(
+            job_id,
+            [
+                MagicMock(page_number=1, image_data=b"a", width=10, height=10, format="png"),
+            ],
+        )
+        response = client.get(f"/api/v1/jobs/{job_id}/document")
+        assert response.status_code == 202
+        assert "processing" in response.text.lower()
 
     def test_get_job_has_timestamps(self) -> None:
         job_id = job_store.create(

@@ -1,7 +1,8 @@
 """Job models for the asynchronous OCR pipeline.
 
-Defines Pydantic models for job status, job metadata, and API responses
-for the async job submission and status query endpoints.
+Defines Pydantic models for job status, job metadata, per-page results,
+aggregated document results, and API responses for the async job submission
+and status query endpoints.
 """
 
 from __future__ import annotations
@@ -42,6 +43,43 @@ class JobPageResult(BaseModel):
     processing_time_ms: float | None = Field(
         default=None, description="Processing time in milliseconds"
     )
+
+
+class DocumentResult(BaseModel):
+    """Aggregated OCR result for a complete document.
+
+    Merges all page-level results into a single coherent output while
+    preserving page order and exposing document-level statistics.
+
+    Attributes:
+        job_id: Unique job identifier.
+        document_text: Full text with page break markers.
+        pages: Per-page OCR results in page order.
+        page_count: Number of pages in the document.
+        languages: Unique detected language codes across all pages.
+        average_confidence: Mean confidence across all pages (if any).
+        total_processing_time_ms: Total OCR time across all pages.
+        average_processing_time_ms: Per-page average processing time.
+        word_count: Total word count across the document.
+        character_count: Total character count across the document.
+    """
+
+    job_id: str = Field(description="Unique job identifier")
+    document_text: str = Field(description="Full text with page break markers")
+    pages: list[JobPageResult] = Field(description="Per-page OCR results in page order")
+    page_count: int = Field(description="Number of pages in the document")
+    languages: list[str] = Field(default_factory=list, description="Unique detected language codes")
+    average_confidence: float | None = Field(
+        default=None, description="Mean confidence across all pages (0.0-1.0)"
+    )
+    total_processing_time_ms: float = Field(
+        description="Total OCR time across all pages in milliseconds"
+    )
+    average_processing_time_ms: float = Field(
+        description="Per-page average processing time in milliseconds"
+    )
+    word_count: int = Field(description="Total word count across the document")
+    character_count: int = Field(description="Total character count across the document")
 
 
 class Job(BaseModel):

@@ -1,7 +1,8 @@
 """Thread-safe in-memory job store.
 
-Stores job metadata, file content, and per-page image data in memory.
-Will be replaced by a proper database backend in Milestone 8.
+Stores job metadata, file content, per-page image data, and aggregated
+document results in memory. Will be replaced by a proper database backend
+in Milestone 8.
 """
 
 from __future__ import annotations
@@ -10,7 +11,7 @@ import threading
 import uuid
 from datetime import UTC, datetime
 
-from ocr_platform.jobs.models import Job, JobPageResult, JobStatus
+from ocr_platform.jobs.models import DocumentResult, Job, JobPageResult, JobStatus
 from ocr_platform.preprocessing.types import PageImage
 
 
@@ -22,6 +23,7 @@ class JobStore:
         _contents: Mapping of job_id → raw file bytes.
         _page_images: Mapping of job_id → {page_number → image bytes}.
         _page_results: Mapping of job_id → {page_number → JobPageResult}.
+        _document_results: Mapping of job_id → DocumentResult.
         _lock: Reentrant lock for thread-safe operations.
     """
 
@@ -30,6 +32,7 @@ class JobStore:
         self._contents: dict[str, bytes] = {}
         self._page_images: dict[str, dict[int, bytes]] = {}
         self._page_results: dict[str, dict[int, JobPageResult]] = {}
+        self._document_results: dict[str, DocumentResult] = {}
         self._lock = threading.RLock()
 
     def create(
@@ -165,6 +168,32 @@ class JobStore:
         with self._lock:
             return len(self._page_results.get(job_id, {})) >= expected_count
 
+    def store_document(self, job_id: str, document: DocumentResult) -> None:
+        """Store the aggregated document result for a job.
+
+        Args:
+            job_id: Unique job identifier.
+            document: Aggregated document result.
+
+        Raises:
+            KeyError: If the job does not exist.
+        """
+        with self._lock:
+            _job = self._jobs[job_id]  # noqa: F841
+            self._document_results[job_id] = document
+
+    def get_document(self, job_id: str) -> DocumentResult | None:
+        """Retrieve the aggregated document result for a job.
+
+        Args:
+            job_id: Unique job identifier.
+
+        Returns:
+            The DocumentResult or ``None`` if not found.
+        """
+        with self._lock:
+            return self._document_results.get(job_id)
+
     def update_status(self, job_id: str, status: JobStatus) -> None:
         """Update the status of a job.
 
@@ -230,7 +259,7 @@ class JobStore:
             self._clear_page_data(job_id)
 
     def delete(self, job_id: str) -> None:
-        """Remove a job and its content from the store.
+        """Remove a job and all associated data from the store.
 
         Args:
             job_id: Unique job identifier.
@@ -239,6 +268,7 @@ class JobStore:
             self._jobs.pop(job_id, None)
             self._contents.pop(job_id, None)
             self._clear_page_data(job_id)
+            self._document_results.pop(job_id, None)
 
     def _clear_page_data(self, job_id: str) -> None:
         """Remove page images and results for a job.

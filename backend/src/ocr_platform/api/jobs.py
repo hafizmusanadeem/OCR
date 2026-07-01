@@ -2,7 +2,8 @@
 
 Provides a non-blocking API for OCR processing:
 * ``POST /api/v1/jobs`` — Upload a file and receive a job ID immediately.
-* ``GET /api/v1/jobs/{job_id}`` — Poll for status and results.
+* ``GET /api/v1/jobs/{job_id}`` — Poll for status and per-page results.
+* ``GET /api/v1/jobs/{job_id}/document`` — Retrieve the merged document result.
 
 The actual OCR work is delegated to a Celery worker via the
 :func:`~ocr_platform.jobs.tasks.process_ocr_job` task.
@@ -13,7 +14,14 @@ from __future__ import annotations
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile, status
 
 from ocr_platform.config import settings
-from ocr_platform.jobs.models import Job, JobCreateResponse, JobDetailResponse, JobStatus
+from ocr_platform.jobs.aggregator import DocumentAggregator
+from ocr_platform.jobs.models import (
+    DocumentResult,
+    Job,
+    JobCreateResponse,
+    JobDetailResponse,
+    JobStatus,
+)
 from ocr_platform.jobs.store import job_store
 from ocr_platform.jobs.tasks import process_ocr_job
 from ocr_platform.logging_config import get_logger
@@ -164,8 +172,8 @@ async def create_job(
     response_model=JobDetailResponse,
     status_code=status.HTTP_200_OK,
     summary="Get job status and results",
-    description="Retrieve the current status and (if completed) results "
-    "of an asynchronous OCR job.",
+    description="Retrieve the current status and (if completed) per-page "
+    "results of an asynchronous OCR job.",
 )
 async def get_job(job_id: str) -> JobDetailResponse:
     """Query the status of an asynchronous OCR job.
@@ -187,3 +195,56 @@ async def get_job(job_id: str) -> JobDetailResponse:
         )
 
     return _job_to_response(job)
+
+
+@router.get(
+    "/jobs/{job_id}/document",
+    response_model=DocumentResult,
+    status_code=status.HTTP_200_OK,
+    summary="Get merged document result",
+    description="Retrieve the aggregated document-level OCR result for a "
+    "completed job. Page results are merged into a single text with "
+    "page break markers, and document-level statistics are computed.",
+)
+async def get_job_document(job_id: str) -> DocumentResult:
+    """Retrieve the merged document result for a completed OCR job.
+
+    Args:
+        job_id: Unique job identifier returned by POST /jobs.
+
+    Returns:
+        DocumentResult with merged text, page list, and statistics.
+
+    Raises:
+        HTTPException: 404 if the job ID is not found.
+        HTTPException: 422 if the job has not completed yet.
+    """
+    job = job_store.get(job_id)
+    if job is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Job '{job_id}' not found.",
+        )
+
+    if job.status == JobStatus.COMPLETED:
+        document = job_store.get_document(job_id)
+        if document is not None:
+            return document
+        # Fallback: re-aggregate from stored pages if document was lost
+        pages = job_store.get_page_results(job_id)
+        total_time = job.total_processing_time_ms or 0.0
+        document = DocumentAggregator.aggregate(job_id, pages, total_time)
+        return document
+
+    if job.status == JobStatus.FAILED:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Job '{job_id}' failed. Error: {job.error}",
+        )
+
+    raise HTTPException(
+        status_code=status.HTTP_202_ACCEPTED,
+        detail=f"Job '{job_id}' is still {job.status.value}. "
+        f"{job.pages_completed}/{job.page_count or '?'} pages completed. "
+        "Poll again later.",
+    )

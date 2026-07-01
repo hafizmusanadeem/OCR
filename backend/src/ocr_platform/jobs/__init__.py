@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from ocr_platform.jobs.models import (
+    DocumentResult,
     Job,
     JobCreateResponse,
     JobDetailResponse,
@@ -12,6 +13,7 @@ from ocr_platform.jobs.models import (
 from ocr_platform.jobs.store import JobStore, job_store
 
 __all__ = [
+    "DocumentResult",
     "Job",
     "JobCreateResponse",
     "JobDetailResponse",

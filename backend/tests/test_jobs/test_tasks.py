@@ -314,3 +314,62 @@ class TestProcessOcrJob:
         # Original content is still there until finalize_job completes
         # (process_ocr_job doesn't delete it anymore)
         assert job_store.get_content(job_id) == b"original"
+
+
+class TestFinalizeJobDocument:
+    """Tests that finalize_job creates and stores a DocumentResult."""
+
+    def setup_method(self) -> None:
+        for job in job_store.list_jobs():
+            job_store.delete(job.id)
+
+    def test_finalize_job_stores_document_result(self) -> None:
+        job_id = job_store.create(
+            filename="test.pdf",
+            content_type="application/pdf",
+            provider="mock",
+            content=b"fake",
+        )
+        job_store.add_page_result(
+            job_id, 1, JobPageResult(page_number=1, text="hello", confidence=0.9, language="en")
+        )
+        job_store.add_page_result(
+            job_id, 2, JobPageResult(page_number=2, text="world", confidence=0.8, language="fr")
+        )
+
+        finalize_job([{}, {}], job_id, 2)
+
+        document = job_store.get_document(job_id)
+        assert document is not None
+        assert document.job_id == job_id
+        assert document.page_count == 2
+        assert document.languages == ["en", "fr"]
+        assert document.average_confidence == 0.85
+        assert "hello" in document.document_text
+        assert "world" in document.document_text
+
+    def test_finalize_job_document_has_correct_stats(self) -> None:
+        job_id = job_store.create(
+            filename="test.pdf",
+            content_type="application/pdf",
+            provider="mock",
+            content=b"fake",
+        )
+        job_store.add_page_result(
+            job_id,
+            1,
+            JobPageResult(page_number=1, text="one two", processing_time_ms=10.0),
+        )
+        job_store.add_page_result(
+            job_id,
+            2,
+            JobPageResult(page_number=2, text="three four five", processing_time_ms=20.0),
+        )
+
+        finalize_job([{}, {}], job_id, 2)
+
+        document = job_store.get_document(job_id)
+        assert document is not None
+        assert document.word_count == 5
+        assert document.total_processing_time_ms == 30.0
+        assert document.average_processing_time_ms == 15.0
