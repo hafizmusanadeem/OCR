@@ -1,0 +1,5 @@
+services:
+  worker:
+    deploy:
+      replicas: 3
+    restart: unless-stopped
