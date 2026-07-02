@@ -13,9 +13,9 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from alembic import context
 
-from ocr_platform.config import settings
-from ocr_platform.db.engine import _make_async_url
-from ocr_platform.db.models import Base
+from src.ocr_platform.config import settings
+from src.ocr_platform.db.engine import _make_async_url
+from src.ocr_platform.db.models import Base
 
 
 # Alembic Config object

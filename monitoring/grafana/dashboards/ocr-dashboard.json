@@ -1,0 +1,98 @@
+{
+  "dashboard": {
+    "title": "OCR Platform Overview",
+    "tags": ["ocr", "monitoring"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Request Rate (RPS)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_request_duration_seconds_count[1m])",
+            "legendFormat": "{{handler}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Request Latency (p95)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[1m]))",
+            "legendFormat": "{{handler}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "OCR Jobs by Status",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "ocr_jobs_total{status=\"pending\"}",
+            "legendFormat": "Pending"
+          },
+          {
+            "expr": "ocr_jobs_total{status=\"processing\"}",
+            "legendFormat": "Processing"
+          },
+          {
+            "expr": "ocr_jobs_total{status=\"completed\"}",
+            "legendFormat": "Completed"
+          },
+          {
+            "expr": "ocr_jobs_total{status=\"failed\"}",
+            "legendFormat": "Failed"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 4,
+        "title": "Average CER by Dataset",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "benchmark_average_cer",
+            "legendFormat": "{{dataset}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 5,
+        "title": "Worker Queue Length",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "celery_queue_length",
+            "legendFormat": "Queue"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16}
+      },
+      {
+        "id": 6,
+        "title": "Average OCR Latency (ms)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "benchmark_average_latency_ms",
+            "legendFormat": "{{engine}}"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16}
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "5s"
+  }
+}
