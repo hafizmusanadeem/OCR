@@ -72,18 +72,19 @@ services:
       - ocr-network
     command: ["celery", "-A", "ocr_platform.jobs.celery_app", "worker", "--loglevel=info", "--concurrency=2"]
 
-  # Placeholder for frontend service (Milestone 11)
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #     dockerfile: Dockerfile
-  #   container_name: ocr-frontend
-  #   ports:
-  #     - "3000:3000"
-  #   depends_on:
-  #     - backend
-  #   networks:
-  #     - ocr-network
+  # Frontend (React) Dashboard
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ocr-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_started
+    networks:
+      - ocr-network
 
 volumes:
   redis_data:

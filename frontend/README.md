@@ -1,36 +1,26 @@
-# Frontend
+# OCR Benchmark & Stress Testing Platform — Frontend
 
-This directory will contain the React-based dashboard for the OCR Benchmark Platform.
+React-based dashboard for the OCR Benchmark & Stress Testing Platform.
 
-## Planned Features (Milestone 11+)
+## Features
 
-- **Jobs Dashboard**: View, filter, and manage OCR jobs in real time.
-- **Queue Monitor**: Visualize Redis queue depth and worker activity.
-- **Results Viewer**: Inspect aggregated OCR results with page-level detail.
-- **Benchmark Charts**: Compare CER, WER, latency, and throughput across engines.
-- **RTL Evaluation**: Dedicated views for Arabic, Urdu, and Hebrew benchmarks.
-- **Leaderboard**: Rank OCR engines by composite score.
-- **Reports**: Export benchmark reports as Markdown, HTML, or PDF.
+- **Jobs page**: View all OCR jobs, their status, and health checks.
+- **Benchmarks page**: Run benchmarks, view results, and inspect leaderboards.
+- **Datasets page**: Browse available benchmark datasets and inspect ground truth.
 
-## Tech Stack (Tentative)
-
-- React 18+ with TypeScript
-- Vite for build tooling
-- Tailwind CSS for styling
-- React Query for server state management
-- Recharts / Chart.js for data visualization
-
-## Development
+## Local development
 
 ```bash
-# Install dependencies
 npm install
-
-# Start development server
 npm run dev
+```
 
-# Build for production
+The dev server runs on `http://localhost:3000` and proxies `/api` to the backend at `http://localhost:8000`.
+
+## Build
+
+```bash
 npm run build
 ```
 
-This section will be expanded as the frontend is implemented in Milestone 11.
+Static files are output to `dist/` and served by the Docker image via Nginx.
