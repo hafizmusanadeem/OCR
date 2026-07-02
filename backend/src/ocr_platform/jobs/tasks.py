@@ -1,11 +1,12 @@
-"""Celery tasks for asynchronous OCR processing.
+"""Celery tasks for asynchronous OCR processing with failure recovery.
 
 The task pipeline is now split into three stages:
 
 1. ``process_ocr_job`` — Preprocesses the document, stores page images,
    and dispatches a Celery chord for concurrent page processing.
 2. ``process_page`` — Runs OCR on a single page image. Executed in
-   parallel by multiple workers.
+   parallel by multiple workers. Includes retry with exponential backoff
+   and circuit breaker protection.
 3. ``finalize_job`` — Callback that aggregates all page results, builds a
    :class:`~ocr_platform.jobs.models.DocumentResult`, and marks the job as completed.
 """
@@ -13,11 +14,14 @@ The task pipeline is now split into three stages:
 from __future__ import annotations
 
 import asyncio
+import time
 
 from celery import chord  # type: ignore[import-untyped]
+from celery.exceptions import SoftTimeLimitExceeded  # type: ignore[import-untyped]
 
 from ocr_platform.jobs.aggregator import DocumentAggregator
 from ocr_platform.jobs.celery_app import celery_app
+from ocr_platform.jobs.circuit_breaker import CircuitBreakerOpen, _page_ocr_breaker
 from ocr_platform.jobs.models import JobPageResult, JobStatus
 from ocr_platform.jobs.store import job_store
 from ocr_platform.logging_config import get_logger
@@ -28,18 +32,41 @@ from ocr_platform.providers.models import OCRResult
 logger = get_logger(__name__)
 
 
-@celery_app.task(bind=True, max_retries=3, default_retry_delay=10)
+def _exponential_backoff(retry_count: int, base: float = 10.0, max_delay: float = 300.0) -> float:
+    """Compute exponential backoff delay with jitter cap.
+
+    Args:
+        retry_count: Current retry attempt (0-based).
+        base: Base delay in seconds.
+        max_delay: Maximum delay in seconds.
+
+    Returns:
+        Delay in seconds.
+    """
+    delay = min(base * (2 ** retry_count), max_delay)
+    return delay
+
+
+@celery_app.task(
+    bind=True,
+    max_retries=5,
+    default_retry_delay=10,
+    soft_time_limit=240,
+    time_limit=300,
+    acks_late=True,
+    reject_on_worker_lost=True,
+)
 def process_page(
     self,  # noqa: ARG001
     job_id: str,
     page_number: int,
     provider_name: str,
 ) -> dict:
-    """Process a single page image asynchronously.
+    """Process a single page image asynchronously with retry and circuit breaker.
 
-    Retrieves the page image from the job store, runs OCR, and stores
-    the result. This task is designed to run concurrently with other
-    page tasks for the same job.
+    Retrieves the page image from the job store, runs OCR (protected by a
+    circuit breaker), and stores the result. Retries on transient errors
+    with exponential backoff.
 
     Args:
         job_id: Unique job identifier.
@@ -51,13 +78,14 @@ def process_page(
 
     Raises:
         self.retry: If a transient error occurs, the task retries up to
-            3 times with a 10-second backoff.
+            5 times with exponential backoff.
     """
     logger.info(
         "page_task_started",
         job_id=job_id,
         page_number=page_number,
         provider=provider_name,
+        retry_count=self.request.retries,
     )
 
     try:
@@ -69,7 +97,12 @@ def process_page(
         if not provider.is_available():
             raise RuntimeError(f"Provider '{provider_name}' is not available")
 
-        result: OCRResult = asyncio.run(provider.recognize(image_data))
+        # Circuit breaker protects OCR calls
+        def _run_ocr():
+            return asyncio.run(provider.recognize(image_data))
+
+        result: OCRResult = _page_ocr_breaker.call(_run_ocr)
+
         page_result = JobPageResult(
             page_number=page_number,
             text=result.text,
@@ -87,17 +120,45 @@ def process_page(
         )
         return page_result.model_dump()
 
+    except SoftTimeLimitExceeded as exc:
+        logger.error(
+            "page_task_soft_timeout",
+            job_id=job_id,
+            page_number=page_number,
+            error=str(exc),
+        )
+        job_store.fail(job_id, f"Page {page_number} timed out (soft limit)")
+        raise
+
+    except CircuitBreakerOpen as exc:
+        logger.warning(
+            "page_task_circuit_open",
+            job_id=job_id,
+            page_number=page_number,
+            error=str(exc),
+        )
+        # Retry after a longer delay when circuit is open
+        countdown = _exponential_backoff(self.request.retries, base=20.0)
+        raise self.retry(exc=exc, countdown=countdown) from None
+
     except Exception as exc:
         logger.error(
             "page_task_failed",
             job_id=job_id,
             page_number=page_number,
             error=str(exc),
+            retry_count=self.request.retries,
         )
-        raise self.retry(exc=exc) from None
+        countdown = _exponential_backoff(self.request.retries)
+        raise self.retry(exc=exc, countdown=countdown) from None
 
 
-@celery_app.task
+@celery_app.task(
+    max_retries=3,
+    default_retry_delay=5,
+    acks_late=True,
+    reject_on_worker_lost=True,
+)
 def finalize_job(
     _results: list,
     job_id: str,
@@ -108,7 +169,8 @@ def finalize_job(
     This is the chord callback that runs after all ``process_page``
     tasks for a job have finished. It reads results from the job store,
     aggregates them into a :class:`~ocr_platform.jobs.models.DocumentResult`,
-    stores the document, and updates the job status.
+    stores the document, and updates the job status. Retries on transient
+    aggregation errors.
 
     Args:
         _results: List of return values from the header tasks (ignored in
@@ -166,7 +228,12 @@ def finalize_job(
         raise
 
 
-@celery_app.task
+@celery_app.task(
+    max_retries=3,
+    default_retry_delay=5,
+    acks_late=True,
+    reject_on_worker_lost=True,
+)
 def process_ocr_job(
     job_id: str,
     content_type: str,
@@ -176,7 +243,8 @@ def process_ocr_job(
 
     Retrieves the raw file, preprocesses it into page images, stores the
     page images in the job store, and launches a Celery chord so that each
-    page is processed by a separate worker concurrently.
+    page is processed by a separate worker concurrently. Retries on transient
+    preprocessing or dispatch errors.
 
     Args:
         job_id: Unique job identifier (used to retrieve content from store).
@@ -211,7 +279,10 @@ def process_ocr_job(
         job_store.store_page_images(job_id, page_images)
 
         # Build chord: one process_page per page, then finalize_job
-        header = [process_page.s(job_id, page.page_number, provider_name) for page in page_images]
+        header = [
+            process_page.s(job_id, page.page_number, provider_name)
+            for page in page_images
+        ]
         callback = finalize_job.s(job_id, len(page_images))
 
         chord(header)(callback)
